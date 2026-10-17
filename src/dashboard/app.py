@@ -248,6 +248,7 @@ with main_tab4:
         st.error(f"Flowsheet Network not loaded: {e}")
 
     if net_ready:
+        from dashboard.isa101_hmi import generate_isa101_pid_svg
         fs_col1, fs_col2 = st.columns([1, 2])
         with fs_col1:
             st.markdown("### 🎛️ Refinery Train Setpoints")
@@ -270,7 +271,24 @@ with main_tab4:
             c_kpi2.metric("Gasoline Pool Octane", f"{fs_res['finished_product_qualities']['gasoline_pool_octane_ron']} RON", delta="Premium Blend")
             c_kpi3.metric("Annualized Complex EBITDA", f"${fs_res['refinery_complex_totals']['annualized_refining_ebitda_usd']/1e9:.2f} Billion USD/yr")
 
-            st.markdown("#### 📦 Commercial Products Ready for Distribution")
+        # ISA-101 High Performance HMI Section
+        st.markdown("---")
+        st.markdown("### 🖥️ ISA-101 High-Performance P&ID Dynamic Console")
+        st.caption("Grayscale industrial standard with alarm-only color rendering and live telemetry tags.")
+        svg_markup = generate_isa101_pid_svg(
+            cdu_feed_bpd=float(crude_bpd),
+            cdu_top_temp_c=fs_res["primary_distillation_unit"]["predicted_thermodynamics"]["top_temperature_c"],
+            cdu_bot_temp_c=fs_res["primary_distillation_unit"]["predicted_thermodynamics"]["bottom_temperature_c"],
+            cdu_flooding_pct=fs_res["primary_distillation_unit"]["predicted_thermodynamics"]["hydraulic_flooding_pct"],
+            vgo_transfer_bpd=fs_res["inter_unit_streams"]["cdu_gas_oil_to_fcc_riser_bpd"],
+            fcc_riser_temp_c=float(fcc_temp),
+            fcc_regen_temp_c=fs_res["secondary_catalytic_cracking_unit"]["operating_parameters"]["regenerator_temperature_c"],
+            gasoline_ron=fs_res["finished_product_qualities"]["gasoline_pool_octane_ron"]
+        )
+        st.markdown(svg_markup, unsafe_allow_html=True)
+        st.markdown("---")
+
+        st.markdown("#### 📦 Commercial Products Ready for Distribution")
             df_slate = pd.DataFrame([
                 {"Product Cut": "Premium Gasoline (CDU+FCC)", "Volume (BPD)": fs_res['finished_refinery_product_slate_bpd']['premium_gasoline_blendstock']},
                 {"Product Cut": "Commercial Jet A-1 Kerosene", "Volume (BPD)": fs_res['finished_refinery_product_slate_bpd']['commercial_jet_a1_kerosene']},
