@@ -1,0 +1,64 @@
+{
+  "certificate_id": "FAT-CERT-1792225398",
+  "timestamp_utc": "2026-10-17T08:23:18Z",
+  "platform_name": "DeepRefine Industry 4.0 Platform",
+  "compliance_standards": [
+    "IEC 61511 (SIS)",
+    "IEC 62443 (OT Security)",
+    "ISO 10816-3 (Vibration)"
+  ],
+  "fat_sat_score": "10/10 (100% PASS)",
+  "certification_status": "APPROVED_FOR_REFINERY_DEPLOYMENT",
+  "test_records": [
+    {
+      "id": "FAT-01",
+      "requirement": "Optical Data Diode Unidirectional Enclosure",
+      "passed": true
+    },
+    {
+      "id": "FAT-02",
+      "requirement": "Cryptographic Tamper Injection Rejection (HMAC-SHA256)",
+      "passed": true
+    },
+    {
+      "id": "FAT-03",
+      "requirement": "AVEVA PI Web API & AspenTech IP.21 Connectors",
+      "passed": true
+    },
+    {
+      "id": "FAT-04",
+      "requirement": "Sensor Sentinel Frozen ADC Channel Intercept",
+      "passed": true
+    },
+    {
+      "id": "FAT-05",
+      "requirement": "ISO-10816-3 Machinery Vibration Classification (Zone C)",
+      "passed": true
+    },
+    {
+      "id": "FAT-06",
+      "requirement": "Crude Switch Dynamic Transient Alert Suppression",
+      "passed": true
+    },
+    {
+      "id": "FAT-07",
+      "requirement": "PINN Digital Twin Mass Conservation (<1ms Inference)",
+      "passed": true
+    },
+    {
+      "id": "FAT-08",
+      "requirement": "Deterministic Slew-Rate Clamping & Thermal Shock Prevention",
+      "passed": true
+    },
+    {
+      "id": "FAT-09",
+      "requirement": "Operator Advisory Card & Cryptographic DCS Slip Audit",
+      "passed": true
+    },
+    {
+      "id": "FAT-10",
+      "requirement": "FMEA Emergency Redundancy to Traditional APC Bumpless Transfer",
+      "passed": true
+    }
+  ]
+}
