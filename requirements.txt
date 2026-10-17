@@ -1,0 +1,16 @@
+torch>=2.2.0
+pytorch-lightning>=2.2.0
+pandas>=2.1.0
+numpy>=1.26.0
+scipy>=1.11.0
+scikit-learn>=1.4.0
+pyarrow>=15.0.0
+fastparquet>=2024.2.0
+kafka-python-ng>=2.2.2
+opcua>=0.98.13
+fastapi>=0.110.0
+uvicorn>=0.28.0
+pydantic>=2.6.0
+prometheus-client>=0.20.0
+matplotlib>=3.8.0
+tqdm>=4.66.0

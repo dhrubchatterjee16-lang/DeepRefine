@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+.venv/
+venv/
+
+# Parquet / Heavy Data (Keep code repo light)
+data/raw/real_benchmark/
+data/raw/sensors/*.parquet
+data/processed/*.parquet
+data/alerts.jsonl
+
+# PyTorch checkpoints (Edge exported model is tracked)
+checkpoints/best_refinery_pm.pt
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
