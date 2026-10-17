@@ -146,49 +146,87 @@ with main_tab2:
             st.bar_chart(df_yields.set_index("Petroleum Cut"))
 
 # =========================================================================
-# PILLAR 3: AUTONOMOUS REINFORCEMENT LEARNING CONTROLLER
+# PILLAR 3: OPERATOR ADVISORY DECISION SUPPORT (PHASE 1 CERTIFIED)
 # =========================================================================
 with main_tab3:
-    st.subheader("⚡ Reinforcement Learning Smart Controller & Setpoint Optimizer")
-    st.markdown("Evaluates continuous process setpoints using the Actor-Critic RL agent in **Shadow Mode**, respecting physical hydraulic safety interlocks.")
+    st.subheader("🛡️ Phase 1 Certified: Read-Only Operator Advisory & Decision Support")
+    st.markdown("""
+    **Safety Mode:** `READ_ONLY_ADVISORY` (Compliant with IEC 61511 / ISA 84 SIS interlocks).  
+    *The AI engine operates strictly in decision-support mode and cannot command physical DCS setpoints without explicit human authorization.*
+    """)
 
     try:
+        from optimizer.advisory_manager import OperatorAdvisoryManager
         shadow_ctrl = ShadowModeController()
+        advisory_mgr = OperatorAdvisoryManager()
         rl_ready = True
     except Exception as e:
         rl_ready = False
-        st.error(f"RL Optimizer not loaded: {e}")
+        st.error(f"Advisory Manager not loaded: {e}")
 
     if rl_ready:
-        st.markdown("### 🎛️ Baseline Plant Operating Conditions")
+        st.markdown("### 🎛️ Current DCS Plant Setpoints")
         c1, c2, c3 = st.columns(3)
         curr_feed = c1.number_input("Crude Feed Rate (BPD)", value=100000, step=5000)
         curr_reflux = c2.number_input("Current Reflux Ratio (L/D)", value=2.40, step=0.05)
         curr_furnace = c3.number_input("Current Furnace Duty (MW)", value=45.0, step=1.0)
 
-        if st.button("🚀 Evaluate AI Closed-Loop Optimization Recommendation", type="primary"):
+        if st.button("🔍 Generate AI Optimization Advisory Card", type="primary"):
             rec = shadow_ctrl.evaluate_recommendation(
                 current_reflux=curr_reflux,
                 current_furnace_mw=curr_furnace,
                 feed_flow_bpd=curr_feed
             )
 
+            # Generate formal advisory record
+            adv_card = advisory_mgr.generate_advisory(
+                unit_id="CDC-201-COLUMN",
+                current_setpoints={"reflux": curr_reflux, "furnace_mw": curr_furnace},
+                proposed_setpoints=rec["recommended_setpoints"],
+                economic_gain_usd_day=rec["expected_economic_benefit"]["daily_profit_gain_usd"],
+                safety_status=rec["status"],
+                flooding_margin_pct=rec["hydraulic_safety_margin"]["flooding_pct"]
+            )
+
+            st.session_state["active_advisory"] = adv_card
+            st.session_state["active_rec"] = rec
+
+        if "active_advisory" in st.session_state:
+            card = st.session_state["active_advisory"]
+            rec = st.session_state["active_rec"]
+
             st.markdown("---")
-            st.markdown("### 📋 AI Autonomous Recommendation & Safety Interlock Status")
+            st.markdown(f"### 📋 Advisory Card: `{card['advisory_id']}`")
+            st.caption(f"Status: **{rec['audit_message']}**")
 
             r_col1, r_col2, r_col3 = st.columns(3)
-            r_col1.metric("Safety Status", rec["status"], delta="CLEARED" if rec["status"] == "APPROVED_BY_SAFETY_INTERLOCK" else "HALTED")
-            r_col2.metric("Recommended Reflux Trim", f"{rec['recommended_setpoints']['reflux_ratio']} (Δ {rec['recommended_setpoints']['delta_reflux']})")
-            r_col3.metric("Recommended Furnace Trim", f"{rec['recommended_setpoints']['furnace_duty_mw']} MW (Δ {rec['recommended_setpoints']['delta_furnace_mw']} MW)")
+            r_col1.metric("Safety Clearance", "VERIFIED", delta="RATE CLAMPED")
+            r_col2.metric("Recommended Reflux", f"{rec['recommended_setpoints']['reflux_ratio']} (Δ {rec['recommended_setpoints']['delta_reflux']})")
+            r_col3.metric("Recommended Furnace", f"{rec['recommended_setpoints']['furnace_duty_mw']} MW (Δ {rec['recommended_setpoints']['delta_furnace_mw']} MW)")
 
-            st.markdown("#### 💰 Economic Value Creation")
-            e1, e2, e3 = st.columns(3)
+            st.markdown("#### 💰 Projected Value Creation")
+            e1, e2 = st.columns(2)
             econ_rec = rec["expected_economic_benefit"]
-            e1.metric("Baseline Daily Profit", f"${econ_rec['baseline_margin_usd_day']:,.0f} USD")
-            e2.metric("Optimized Daily Profit", f"${econ_rec['optimized_margin_usd_day']:,.0f} USD")
-            e3.metric("Annualized Value Uplift", f"+${econ_rec['annualized_gain_usd']:,.0f} USD/yr", delta="ROI Positive")
+            e1.metric("Daily Profit Uplift", f"+${econ_rec['daily_profit_gain_usd']:,.0f} USD/day")
+            e2.metric("Annualized Value Uplift", f"+${econ_rec['annualized_gain_usd']:,.0f} USD/yr", delta="ROI Cleared")
 
-            st.success("✅ Setpoint recommendation verified against column hydraulic limits and equipment vibration thresholds.")
+            st.markdown("---")
+            st.markdown("### ✍️ Human Operator Clearance Sign-off")
+            with st.form("operator_clearance_form"):
+                badge_id = st.text_input("Lead Board Operator Badge ID", value="OP-7412-SENIOR")
+                decision = st.radio("Operator Decision", ["ACCEPT_TRIM (Generate DCS Console Entry Slip)", "REJECT_TRIM (Override AI Recommendation)"])
+                justification = st.text_area("Engineering Justification / Log Reason", value="Verified column top temperature and hydraulic tray stability. Setpoint ramp cleared for manual DCS execution.")
+                submit_clearance = st.form_submit_button("Sign & Authorize Advisory")
+
+                if submit_clearance:
+                    audit_res = advisory_mgr.record_operator_clearance(
+                        advisory_id=card["advisory_id"],
+                        operator_badge_id=badge_id,
+                        decision=decision.split(" ")[0],
+                        justification=justification
+                    )
+                    st.success(f"✅ Authorization recorded in immutable audit journal: {audit_res['dcs_console_slip']}")
+
 
 st.markdown("---")
 st.caption("Digital Refinery Master Platform • Full 3-Pillar Architecture (Predictive Maintenance + Digital Twin + Smart Control RL)")

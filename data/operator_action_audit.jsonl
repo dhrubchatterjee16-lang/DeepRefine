@@ -1,0 +1,1 @@
+{"advisory_id": "ADV-1792224746-61F1", "timestamp": "2026-10-17T08:12:26Z", "operator_badge": "OP-8821-LEAD", "decision": "ACCEPTED_BY_OPERATOR", "justification": "Hydraulic stability verified. Column delta-P normal. Executed in DCS console.", "dcs_console_slip": "MANUAL_ENTRY_REF_ADV-1792224746-61F1 (Signed by Badge #OP-8821-LEAD)"}
