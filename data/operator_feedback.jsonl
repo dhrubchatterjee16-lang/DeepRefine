@@ -1,3 +1,4 @@
 {"timestamp": "2026-10-15T20:03:32Z", "order_id": "WO-DEMO-01", "operator_action": "ACKNOWLEDGED_TRUE_ALERT", "notes": "Bearing inspected on unit floor. Lubrication degraded."}
 {"timestamp": "2026-10-15T20:25:16Z", "order_id": "WO-DEMO-01", "operator_action": "ACKNOWLEDGED_TRUE_ALERT", "notes": "Bearing inspected on unit floor. Lubrication degraded."}
 {"timestamp": "2026-10-17T07:56:34Z", "order_id": "WO-DEMO-01", "operator_action": "ACKNOWLEDGED_TRUE_ALERT", "notes": "Bearing inspected on unit floor. Lubrication degraded."}
+{"timestamp": "2026-10-17T08:26:08Z", "order_id": "WO-DEMO-01", "operator_action": "ACKNOWLEDGED_TRUE_ALERT", "notes": "Bearing inspected on unit floor. Lubrication degraded."}
