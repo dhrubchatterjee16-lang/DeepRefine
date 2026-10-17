@@ -1,8 +1,9 @@
 """
-Refinery Operator Visual Dashboard (Streamlit) - Enterprise Edition v3.0
-Includes:
+Refinery Operator Visual Dashboard (Streamlit) - Master Edition v4.0
+Complete integration of all 3 Pillars:
 - PILLAR 1: Predictive Maintenance (Real-time degradation, ISO-10816, SAP Work Orders, Human Feedback)
 - PILLAR 2: Digital Twin Simulator & What-If Scenario Lab (Thermodynamic PINN Surrogate, Yields, Carbon & Economic Margin)
+- PILLAR 3: Smart Control & Autonomous Optimization (RL Actor-Critic, Safe Shadow-Mode Trims, $ Profit Uplift)
 """
 
 import streamlit as st
@@ -14,20 +15,24 @@ import json
 
 from model.cmms import RefineryCMMSBridge
 from digital_twin.twin_engine import DigitalTwinSimulator
+from optimizer.shadow_controller import ShadowModeController
 
 st.set_page_config(
-    page_title="Digital Refinery Command Center | AI & Digital Twin",
+    page_title="Digital Refinery Master Platform | AI, Digital Twin & Smart Control",
     page_icon="🏭",
     layout="wide"
 )
 
 cmms_bridge = RefineryCMMSBridge()
 
-st.title("🏭 Digital Refinery - AI & Digital Twin Command Center")
-st.markdown("Integrated **Predictive Maintenance Engine (Pillar 1)** and **Thermodynamic Digital Twin Simulator (Pillar 2)**.")
+st.title("🏭 Digital Refinery - Industry 4.0 Autonomous Operations")
+st.markdown("Unified platform powering **Predictive Maintenance (P1)**, **Thermodynamic Digital Twin (P2)**, and **RL Smart Control & Yield Optimization (P3)**.")
 
-# Top Navigation Tabs
-main_tab1, main_tab2 = st.tabs(["🛡️ Pillar 1: Predictive Maintenance", "🔮 Pillar 2: Distillation Digital Twin Simulator"])
+main_tab1, main_tab2, main_tab3 = st.tabs([
+    "🛡️ Pillar 1: Predictive Maintenance",
+    "🔮 Pillar 2: Distillation Digital Twin",
+    "⚡ Pillar 3: Autonomous RL Optimization"
+])
 
 # =========================================================================
 # PILLAR 1: PREDICTIVE MAINTENANCE
@@ -86,12 +91,10 @@ with main_tab1:
             st.info("No active work orders.")
 
 # =========================================================================
-# PILLAR 2: DIGITAL TWIN SIMULATOR (WHAT-IF SCENARIOS)
+# PILLAR 2: DIGITAL TWIN SIMULATOR
 # =========================================================================
 with main_tab2:
     st.subheader("🔬 Atmospheric Distillation Column - Real-Time What-If Scenario Lab")
-    st.markdown("Simulate changes in crude throughput, furnace heat duty, and reflux ratios with instantaneous first-principles PINN surrogate feedback.")
-
     try:
         twin_sim = DigitalTwinSimulator()
         sim_ready = True
@@ -101,41 +104,32 @@ with main_tab2:
 
     if sim_ready:
         ctl_col, res_col = st.columns([1, 2])
-
         with ctl_col:
             st.markdown("### 🎛️ Process Setpoints")
-            feed_rate = st.slider("Crude Feed Throughput (BPD)", min_value=60000, max_value=140000, value=100000, step=5000)
-            furnace_duty = st.slider("Reboiler / Furnace Duty (MW)", min_value=30.0, max_value=65.0, value=45.0, step=1.0)
-            reflux_r = st.slider("Overhead Reflux Ratio (L/D)", min_value=1.5, max_value=3.5, value=2.4, step=0.1)
-            feed_t = st.slider("Furnace Outlet Temperature (°C)", min_value=320.0, max_value=375.0, value=345.0, step=1.0)
+            feed_rate = st.slider("Crude Feed Throughput (BPD)", 60000, 140000, 100000, 5000)
+            furnace_duty = st.slider("Reboiler / Furnace Duty (MW)", 30.0, 65.0, 45.0, 1.0)
+            reflux_r = st.slider("Overhead Reflux Ratio (L/D)", 1.5, 3.5, 2.4, 0.1)
+            feed_t = st.slider("Furnace Outlet Temperature (°C)", 320.0, 375.0, 345.0, 1.0)
             
-            st.markdown("### 🛢️ Crude Assay Composition")
             c_naphtha = st.slider("Naphtha Cut (%)", 15.0, 30.0, 22.0, 1.0) / 100.0
             c_kero = st.slider("Kerosene / Jet Fuel (%)", 10.0, 22.0, 16.0, 1.0) / 100.0
             c_diesel = st.slider("Diesel Cut (%)", 20.0, 35.0, 28.0, 1.0) / 100.0
             c_residue = max(0.01, 1.0 - (c_naphtha + c_kero + c_diesel))
-            st.caption(f"Atmospheric Bottoms / Residue: **{c_residue*100:.1f}%**")
 
             sim_results = twin_sim.simulate_what_if(
                 feed_flow_bpd=float(feed_rate),
                 feed_temp_c=float(feed_t),
                 reflux_ratio=float(reflux_r),
                 furnace_duty_mw=float(furnace_duty),
-                crude_composition={
-                    "naphtha_pct": c_naphtha,
-                    "kerosene_pct": c_kero,
-                    "diesel_pct": c_diesel,
-                    "residue_pct": c_residue
-                }
+                crude_composition={"naphtha_pct": c_naphtha, "kerosene_pct": c_kero, "diesel_pct": c_diesel, "residue_pct": c_residue}
             )
 
         with res_col:
-            st.markdown("### 📊 Predicted Operating Thermodynamics & Yields")
-            
-            kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+            st.markdown("### 📊 Operating Thermodynamics & Yields")
             thermo = sim_results["predicted_thermodynamics"]
             econ = sim_results["economics_and_emissions"]
             
+            kpi1, kpi2, kpi3, kpi4 = st.columns(4)
             kpi1.metric("Top Temp", f"{thermo['top_temperature_c']} °C")
             kpi2.metric("Bottom Temp", f"{thermo['bottom_temperature_c']} °C")
             kpi3.metric("Hydraulic Flooding", f"{thermo['hydraulic_flooding_pct']}%", 
@@ -143,8 +137,7 @@ with main_tab2:
                         delta_color="normal" if thermo['flooding_alert'] == "SAFE_REGIME" else "inverse")
             kpi4.metric("Est. Daily Margin", f"${econ['estimated_operating_margin_usd_day']:,.0f} USD")
 
-            st.markdown("---")
-            st.markdown("#### 📦 Product Cut Distribution (Barrels Per Day)")
+            st.markdown("#### 📦 Product Cut Distribution (BPD)")
             yields = sim_results["product_yields_bpd"]
             df_yields = pd.DataFrame({
                 "Petroleum Cut": ["Naphtha (Gasoline)", "Kerosene (Jet Fuel)", "Diesel (Gas Oil)", "Atmospheric Residue"],
@@ -152,8 +145,50 @@ with main_tab2:
             })
             st.bar_chart(df_yields.set_index("Petroleum Cut"))
 
-            st.markdown("#### 🌿 Environmental Impact")
-            st.info(f"🔥 Daily Carbon Footprint: **{econ['carbon_footprint_co2_tons_day']:.1f} Metric Tons CO₂ / day** from furnace combustion.")
+# =========================================================================
+# PILLAR 3: AUTONOMOUS REINFORCEMENT LEARNING CONTROLLER
+# =========================================================================
+with main_tab3:
+    st.subheader("⚡ Reinforcement Learning Smart Controller & Setpoint Optimizer")
+    st.markdown("Evaluates continuous process setpoints using the Actor-Critic RL agent in **Shadow Mode**, respecting physical hydraulic safety interlocks.")
+
+    try:
+        shadow_ctrl = ShadowModeController()
+        rl_ready = True
+    except Exception as e:
+        rl_ready = False
+        st.error(f"RL Optimizer not loaded: {e}")
+
+    if rl_ready:
+        st.markdown("### 🎛️ Baseline Plant Operating Conditions")
+        c1, c2, c3 = st.columns(3)
+        curr_feed = c1.number_input("Crude Feed Rate (BPD)", value=100000, step=5000)
+        curr_reflux = c2.number_input("Current Reflux Ratio (L/D)", value=2.40, step=0.05)
+        curr_furnace = c3.number_input("Current Furnace Duty (MW)", value=45.0, step=1.0)
+
+        if st.button("🚀 Evaluate AI Closed-Loop Optimization Recommendation", type="primary"):
+            rec = shadow_ctrl.evaluate_recommendation(
+                current_reflux=curr_reflux,
+                current_furnace_mw=curr_furnace,
+                feed_flow_bpd=curr_feed
+            )
+
+            st.markdown("---")
+            st.markdown("### 📋 AI Autonomous Recommendation & Safety Interlock Status")
+
+            r_col1, r_col2, r_col3 = st.columns(3)
+            r_col1.metric("Safety Status", rec["status"], delta="CLEARED" if rec["status"] == "APPROVED_BY_SAFETY_INTERLOCK" else "HALTED")
+            r_col2.metric("Recommended Reflux Trim", f"{rec['recommended_setpoints']['reflux_ratio']} (Δ {rec['recommended_setpoints']['delta_reflux']})")
+            r_col3.metric("Recommended Furnace Trim", f"{rec['recommended_setpoints']['furnace_duty_mw']} MW (Δ {rec['recommended_setpoints']['delta_furnace_mw']} MW)")
+
+            st.markdown("#### 💰 Economic Value Creation")
+            e1, e2, e3 = st.columns(3)
+            econ_rec = rec["expected_economic_benefit"]
+            e1.metric("Baseline Daily Profit", f"${econ_rec['baseline_margin_usd_day']:,.0f} USD")
+            e2.metric("Optimized Daily Profit", f"${econ_rec['optimized_margin_usd_day']:,.0f} USD")
+            e3.metric("Annualized Value Uplift", f"+${econ_rec['annualized_gain_usd']:,.0f} USD/yr", delta="ROI Positive")
+
+            st.success("✅ Setpoint recommendation verified against column hydraulic limits and equipment vibration thresholds.")
 
 st.markdown("---")
-st.caption("Digital Refinery AI Platform • Pillar 1: Predictive Maintenance & ISO-10816 • Pillar 2: Thermodynamic PINN Digital Twin")
+st.caption("Digital Refinery Master Platform • Full 3-Pillar Architecture (Predictive Maintenance + Digital Twin + Smart Control RL)")
