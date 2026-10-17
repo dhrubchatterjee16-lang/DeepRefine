@@ -28,10 +28,11 @@ cmms_bridge = RefineryCMMSBridge()
 st.title("🏭 Digital Refinery - Industry 4.0 Autonomous Operations")
 st.markdown("Unified platform powering **Predictive Maintenance (P1)**, **Thermodynamic Digital Twin (P2)**, and **RL Smart Control & Yield Optimization (P3)**.")
 
-main_tab1, main_tab2, main_tab3 = st.tabs([
+main_tab1, main_tab2, main_tab3, main_tab4 = st.tabs([
     "🛡️ Pillar 1: Predictive Maintenance",
     "🔮 Pillar 2: Distillation Digital Twin",
-    "⚡ Pillar 3: Autonomous RL Optimization"
+    "⚡ Pillar 3: Operator Advisory (RL)",
+    "🌐 Path C: Plant Flowsheet Network (CDU + FCCU)"
 ])
 
 # =========================================================================
@@ -228,5 +229,57 @@ with main_tab3:
                     st.success(f"✅ Authorization recorded in immutable audit journal: {audit_res['dcs_console_slip']}")
 
 
+# =========================================================================
+# PATH C: PLANT-WIDE FLOWSHEET NETWORK (CDU + FCCU)
+# =========================================================================
+with main_tab4:
+    st.subheader("🌐 Plant-Wide Multi-Unit Flowsheet Network (CDU + FCCU Coupling)")
+    st.markdown("""
+    **Coupled Refining Train:**  
+    Atmospheric Distillation Unit (CDU) $\\rightarrow$ Gas Oil Stream $\\rightarrow$ Fluid Catalytic Cracker (FCCU) $\\rightarrow$ Gasoline Pool Octane Blending.
+    """)
+
+    try:
+        from digital_twin.plant_flowsheet import RefineryFlowsheetNetwork
+        flowsheet_net = RefineryFlowsheetNetwork()
+        net_ready = True
+    except Exception as e:
+        net_ready = False
+        st.error(f"Flowsheet Network not loaded: {e}")
+
+    if net_ready:
+        fs_col1, fs_col2 = st.columns([1, 2])
+        with fs_col1:
+            st.markdown("### 🎛️ Refinery Train Setpoints")
+            crude_bpd = st.slider("Total Crude Intake (BPD)", 70000, 130000, 100000, 5000, key="fs_crude")
+            fcc_temp = st.slider("FCC Riser Reaction Temp (°C)", 500.0, 550.0, 528.0, 1.0, key="fs_fcc_t")
+            fcc_cat = st.slider("Catalyst-to-Oil Ratio", 5.0, 9.0, 7.0, 0.1, key="fs_fcc_cat")
+
+            fs_res = flowsheet_net.simulate_plant_flowsheet(
+                crude_feed_bpd=float(crude_bpd),
+                cdu_reflux=2.40,
+                cdu_furnace_mw=45.0,
+                fcc_riser_temp_c=float(fcc_temp),
+                fcc_cat_to_oil=float(fcc_cat)
+            )
+
+        with fs_col2:
+            st.markdown("### 📊 Finished Commercial Product Slate & Quality")
+            c_kpi1, c_kpi2, c_kpi3 = st.columns(3)
+            c_kpi1.metric("Inter-Unit VGO Transfer", f"{fs_res['inter_unit_streams']['cdu_gas_oil_to_fcc_riser_bpd']:,} BPD")
+            c_kpi2.metric("Gasoline Pool Octane", f"{fs_res['finished_product_qualities']['gasoline_pool_octane_ron']} RON", delta="Premium Blend")
+            c_kpi3.metric("Annualized Complex EBITDA", f"${fs_res['refinery_complex_totals']['annualized_refining_ebitda_usd']/1e9:.2f} Billion USD/yr")
+
+            st.markdown("#### 📦 Commercial Products Ready for Distribution")
+            df_slate = pd.DataFrame([
+                {"Product Cut": "Premium Gasoline (CDU+FCC)", "Volume (BPD)": fs_res['finished_refinery_product_slate_bpd']['premium_gasoline_blendstock']},
+                {"Product Cut": "Commercial Jet A-1 Kerosene", "Volume (BPD)": fs_res['finished_refinery_product_slate_bpd']['commercial_jet_a1_kerosene']},
+                {"Product Cut": "Ultra-Low Sulfur Diesel", "Volume (BPD)": fs_res['finished_refinery_product_slate_bpd']['ultra_low_sulfur_diesel']},
+                {"Product Cut": "Liquefied Petroleum Gas (LPG)", "Volume (BPD)": fs_res['finished_refinery_product_slate_bpd']['liquefied_petroleum_gas_lpg']},
+                {"Product Cut": "Heavy Fuel Oil Residue", "Volume (BPD)": fs_res['finished_refinery_product_slate_bpd']['heavy_fuel_oil_residue']}
+            ])
+            st.bar_chart(df_slate.set_index("Product Cut"))
+            st.info(f"🌿 Total Complex Carbon Footprint: **{fs_res['refinery_complex_totals']['total_carbon_emissions_tons_co2_day']:.1f} Tons CO₂/day** (CDU Firing + FCC Regenerator Flue Gas)")
+
 st.markdown("---")
-st.caption("Digital Refinery Master Platform • Full 3-Pillar Architecture (Predictive Maintenance + Digital Twin + Smart Control RL)")
+st.caption("DeepRefine Master Platform • Full Industry 4.0 Suite (P1: Predictive Maintenance, P2: Digital Twin, P3: Smart Advisory, Path C: Multi-Unit Flowsheet)")
