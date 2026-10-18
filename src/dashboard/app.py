@@ -20,9 +20,12 @@ from digital_twin.twin_engine import DigitalTwinSimulator
 from optimizer.shadow_controller import ShadowModeController
 from security.idmz_gateway import IndustrialDemilitarizedZone
 from optimizer.rto_mpc_coordinator import RTOMPCCoordinator
+from optimizer.dynamic_mpc import DynamicDMCEngine
 from digital_twin.dvr_engine import RefineryDVREngine
 from digital_twin.inferential_analyzers import InferentialAnalyzerSuite
+from digital_twin.lims_reconciliation import LIMSAssayReconciliationEngine
 from model.api670_pdm import API670MachineryDiagnosticEngine
+from security.sil3_safety_interface import IndependentSIL3SafetyInterface
 
 st.set_page_config(
     page_title="DeepRefine Master Platform | Tier-1 Industrial Refinery Operations",
@@ -33,9 +36,12 @@ st.set_page_config(
 cmms_bridge = RefineryCMMSBridge()
 idmz_gateway = IndustrialDemilitarizedZone()
 rto_mpc = RTOMPCCoordinator()
+dynamic_dmc = DynamicDMCEngine()
 dvr_engine = RefineryDVREngine()
 inferentials = InferentialAnalyzerSuite()
+lims_engine = LIMSAssayReconciliationEngine()
 api670_engine = API670MachineryDiagnosticEngine()
+sil3_gateway = IndependentSIL3SafetyInterface()
 
 st.title("🏭 DeepRefine - Tier-1 Autonomous Refinery Platform")
 st.markdown("Enterprise-grade Industry 4.0 software suite: **Predictive Maintenance**, **Thermodynamic Digital Twin**, **RTO-MPC Smart Control**, and **IEC 62443 IDMZ Architecture**.")
@@ -223,6 +229,39 @@ with main_tab2:
         else:
             st.success("✅ All flow instruments validated within statistical tolerance.")
 
+    st.markdown("---")
+    st.subheader("🧪 LIMS Laboratory Assay Reconciliation & Exponential Bias Filter")
+    st.markdown("Automated calibration of virtual soft sensors against daily physical laboratory assays (ASTM D2699 knock engine, ASTM D93 flash, ASTM D86).")
+
+    lims_col1, lims_col2 = st.columns([1, 2])
+    with lims_col1:
+        lims_prop = st.selectbox("LIMS Assay Property", ["gasoline_ron", "kerosene_flash_c", "diesel_d86_95_c"], key="lims_prop_sel")
+        measured_lab = st.number_input("Lab Assay Measurement", value=94.8 if lims_prop == "gasoline_ron" else (41.0 if lims_prop == "kerosene_flash_c" else 352.0), step=0.1)
+        model_pred = 95.3 if lims_prop == "gasoline_ron" else (39.2 if lims_prop == "kerosene_flash_c" else 356.5)
+
+        reconcile_btn = st.button("📥 Ingest LIMS Assay & Update Bias", key="ingest_lims")
+
+    with lims_col2:
+        if reconcile_btn or "last_lims_res" in st.session_state:
+            if reconcile_btn:
+                st.session_state["last_lims_res"] = lims_engine.reconcile_lab_sample(
+                    property_name=lims_prop,
+                    lab_measured_value=float(measured_lab),
+                    model_prediction_at_sample_time=float(model_pred)
+                )
+            l_res = st.session_state["last_lims_res"]
+            if l_res["status"] == "ASSAY_RECONCILED_SUCCESS":
+                st.success(f"✅ Assay Reconciled ({l_res['sample_tag_id']}): Updated Bias = **{l_res['updated_bias']:+.3f}** (Residual: {l_res['raw_residual']:+.2f})")
+                comp_prop = lims_engine.apply_bias_compensation(lims_prop, model_pred)
+                c_col1, c_col2, c_col3 = st.columns(3)
+                c_col1.metric("Raw Soft Sensor", f"{comp_prop['raw_model_val']}")
+                c_col2.metric("Active LIMS Bias", f"{comp_prop['active_lims_bias']:+.3f}")
+                c_col3.metric("LIMS Compensated", f"{comp_prop['compensated_val']}", delta="Production Ready")
+            else:
+                st.error(f"🚨 {l_res['message']}")
+        else:
+            st.info("Awaiting new LIMS laboratory assay transmission.")
+
 # =========================================================================
 # PILLAR 3: RTO / MPC COORDINATOR & SIS SAFETY INTERLOCKS
 # =========================================================================
@@ -282,6 +321,26 @@ with main_tab3:
         )
         if staged_ok:
             st.success(f"✅ Targets Staged in Level 3.5 IDMZ Proxy (`{staged_order['idmz_stage_id']}`) with mutual TLS & Watchdog clearance.")
+
+    st.markdown("---")
+    st.subheader("📈 Dynamic Multivariable DMC (Finite Impulse Response & Dead-Time Prediction)")
+    st.markdown("Simulates multi-step dynamic matrix convolution over 25-step prediction horizon with process dead-time ($\theta$) and lag ($\tau$).")
+
+    dmc_eval = dynamic_dmc.solve_dynamic_qp(
+        current_cvs={"cdu_top_temp_c": 112.0, "cdu_bottom_temp_c": 345.0, "fcc_riser_outlet_temp_c": 532.0, "fcc_regenerator_temp_c": 710.0},
+        target_cvs={"cdu_top_temp_c": 115.0, "cdu_bottom_temp_c": 342.0, "fcc_riser_outlet_temp_c": 528.0, "fcc_regenerator_temp_c": 718.0}
+    )
+    df_traj = pd.DataFrame(dmc_eval["predicted_trajectories"])
+    st.line_chart(df_traj)
+    st.caption("25-step predicted dynamic trajectories showing dead-time delay and gradual asymptotic settling.")
+
+    st.markdown("---")
+    st.subheader("🛡️ Independent Hardware SIL-3 Safety Gateway (IEC 61511 / IEC 61508)")
+    sil_status = sil3_gateway.query_safety_status_for_rto()
+    s_col1, s_col2, s_col3 = st.columns(3)
+    s_col1.metric("Safety Integrity Level", "SIL-3 (Triconex TMR)")
+    s_col2.metric("Watchdog Relay", "ENERGIZED (Healthy)" if sil_status["watchdog_relay_healthy"] else "DROPPED", delta="Hardware Heartbeat")
+    s_col3.metric("L3 Access Mode", "READ-ONLY", delta="Zero Bypass Authority")
 
 # =========================================================================
 # PATH C: PLANT-WIDE FLOWSHEET NETWORK (CDU + FCCU)
@@ -391,6 +450,14 @@ with main_tab5:
         **4. API 670 Machinery Diagnostics & Inferential Soft Sensors**
         - **Problem:** Generic aviation data (C-MAPSS) fails to reflect continuous refinery rotating machinery.
         - **Fix:** Deployed API 670 orthogonal proximity probes (orbit analysis), ASME PTC 10 compressor surge margins, API 610 pump cavitation metrics, and real-time RON/flash/freeze virtual analyzers.
+
+        **5. Dynamic Multivariable DMC & Dead-Time Prediction**
+        - **Problem:** Instantaneous static matrix inversion risks limit cycles on 45-180 min column thermal lags.
+        - **Fix:** Implemented Finite Impulse Response (FIR) step-response convolution over 25-step horizon with move suppression.
+
+        **6. LIMS Laboratory Assay Feedback & Independent SIL-3 Decoupling**
+        - **Problem:** Soft sensors drift over multi-week runs; Level 3 software must not act as the safety interlock.
+        - **Fix:** Automated 3.5-sigma LIMS lab error rejection with exponential bias updating; physically decoupled SIL-3 safety PLC gateway with TMR 2oo3 majority voting.
         """)
 
 st.markdown("---")
