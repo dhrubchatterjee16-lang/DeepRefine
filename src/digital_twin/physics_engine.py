@@ -112,11 +112,14 @@ class CrudeDistillationDigitalTwin:
         self.liquid_fractions = np.clip(self.liquid_fractions + dx * (dt_seconds * 0.05), 0.0, 1.0)
         self.liquid_fractions /= np.sum(self.liquid_fractions, axis=-1, keepdims=True)
 
-        # Cut yields (Barrels per day)
-        naphtha_yield = float(feed_flow_bpd * crude_composition[0] * (reflux_ratio / 3.0))
-        kero_yield = float(feed_flow_bpd * crude_composition[1] * 0.95)
+        # Cut yields (Barrels per day) governed by component recovery and fractionation efficiency
+        # Higher reflux ratio improves separation sharpness of light ends
+        fractionation_efficiency = 1.0 - 0.15 * np.exp(-reflux_ratio / 2.0)
+        naphtha_yield = float(feed_flow_bpd * crude_composition[0] * fractionation_efficiency)
+        kero_yield = float(feed_flow_bpd * crude_composition[1] * 0.96)
         diesel_yield = float(feed_flow_bpd * crude_composition[2] * 0.98)
-        residue_yield = float(feed_flow_bpd - (naphtha_yield + kero_yield + diesel_yield))
+        residue_yield = float(max(0.0, feed_flow_bpd - (naphtha_yield + kero_yield + diesel_yield)))
+
 
         # Update thermodynamic temperature profile
         for i in range(self.n_trays):

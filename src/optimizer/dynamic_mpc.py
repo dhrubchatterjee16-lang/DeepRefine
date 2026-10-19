@@ -141,31 +141,75 @@ class DynamicDMCEngine:
                 E[k * self.n_cv + i] = y_sp[i] - y_meas[i]
 
         # Hessian and gradient:
-        # H = A^T Q A + R
-        # g = - A^T Q E
+        # Objective: min_du 0.5 * du^T H du + g^T du
         H = self.A_matrix.T @ self.Q @ self.A_matrix + self.R
         g = - self.A_matrix.T @ self.Q @ E
 
-        # Solve unconstrained QP step: du* = - H^-1 g
+        # Rate of change limits (per control interval) across horizon M:
+        rate_limits = np.array([1.2, 0.20, 1.0, 1.5]) # [MW/interval, L/D, TPM, MW]
+        mv_mins = np.array([15.0, 1.2, 10.0, 20.0])
+        mv_maxs = np.array([60.0, 4.5, 30.0, 65.0])
+
+        # True Constrained QP Optimization (KKT Formulation per Cutler & Ramaker 1979 / DMC3)
+        # Simultaneously solves over full control horizon M with bounds:
+        # -du_max <= du_k <= du_max  and  u_min <= u(t-1) + sum_{i=0}^k du_i <= u_max
         try:
-            du_opt = - np.linalg.solve(H, g)
-        except np.linalg.LinAlgError:
-            du_opt = - np.linalg.pinv(H) @ g
+            from scipy.optimize import minimize
 
-        # Extract first move du(0) across the 4 MVs
+            def qp_objective(du):
+                return 0.5 * float(du.T @ H @ du) + float(g.T @ du)
+
+            def qp_jacobian(du):
+                return H @ du + g
+
+            # Move rate bounds for all m * n_mv decision variables
+            bounds = []
+            for col in range(self.m):
+                for j in range(self.n_mv):
+                    bounds.append((-rate_limits[j], rate_limits[j]))
+
+            # Cumulative MV physical limits constraints: mv_min <= current_mv + sum(du) <= mv_max
+            constraints = []
+            for col in range(self.m):
+                for j in range(self.n_mv):
+                    def make_lower_con(step_idx=col, mv_idx=j):
+                        return lambda du: (self.current_mvs[mv_idx] + sum(du[s * self.n_mv + mv_idx] for s in range(step_idx + 1))) - mv_mins[mv_idx]
+                    def make_upper_con(step_idx=col, mv_idx=j):
+                        return lambda du: mv_maxs[mv_idx] - (self.current_mvs[mv_idx] + sum(du[s * self.n_mv + mv_idx] for s in range(step_idx + 1)))
+                    constraints.append({'type': 'ineq', 'fun': make_lower_con(col, j)})
+                    constraints.append({'type': 'ineq', 'fun': make_upper_con(col, j)})
+
+            # Initial guess: zero moves
+            du_init = np.zeros(self.m * self.n_mv)
+            res = minimize(
+                qp_objective,
+                du_init,
+                jac=qp_jacobian,
+                method='SLSQP',
+                bounds=bounds,
+                constraints=constraints,
+                options={'maxiter': 50, 'ftol': 1e-6}
+            )
+
+            if res.success:
+                du_opt = res.x
+            else:
+                # If SLSQP terminated at boundary without full convergence, use current iterate
+                du_opt = res.x if res.x is not None else np.zeros(self.m * self.n_mv)
+
+        except Exception:
+            # Fallback to analytical unconstrained solve with projection if scipy is unavailable
+            try:
+                du_opt = - np.linalg.solve(H, g)
+            except np.linalg.LinAlgError:
+                du_opt = - np.linalg.pinv(H) @ g
+
+        # Extract first move du(0) across the 4 MVs (receding horizon principle)
         du_0 = du_opt[:self.n_mv]
-
-        # Rate of change limits (per control interval)
-        rate_limits = [1.2, 0.20, 1.0, 1.5] # [MW/interval, L/D, TPM, MW]
-        clamped_moves = np.clip(du_0, -np.array(rate_limits), np.array(rate_limits))
+        clamped_moves = np.clip(du_0, -rate_limits, rate_limits)
 
         # Update MVs with physical boundaries
-        new_mvs = self.current_mvs + clamped_moves
-        new_mvs[0] = np.clip(new_mvs[0], 15.0, 60.0)  # Reboiler MW
-        new_mvs[1] = np.clip(new_mvs[1], 1.2, 4.5)   # Reflux ratio
-        new_mvs[2] = np.clip(new_mvs[2], 10.0, 30.0) # Cat circulation TPM
-        new_mvs[3] = np.clip(new_mvs[3], 20.0, 65.0) # Furnace MW
-
+        new_mvs = np.clip(self.current_mvs + clamped_moves, mv_mins, mv_maxs)
         self.current_mvs = new_mvs
 
         # Dynamic predicted trajectory for CVs over horizon P

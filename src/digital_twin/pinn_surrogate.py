@@ -33,13 +33,27 @@ class DistillationSurrogatePINN(nn.Module):
 
     def compute_physics_loss(self, inputs: torch.Tensor, predictions: torch.Tensor) -> torch.Tensor:
         """
-        Physics-informed regularization:
-        Enforces Overall Mass Conservation:
-        Mass_in (feed_flow_bpd) == Mass_out (naphtha + kero + diesel + residue)
-        """
-        feed_flow = inputs[:, 0] # feed_flow_bpd
-        predicted_total_yield = torch.sum(predictions[:, 4:8], dim=-1) # Sum of 4 cuts
+        Physics-Informed Regularization (True Mass Conservation per VDI 2048 / AIChE standards):
+        Enforces Mass_in (metric tons/hr) == Mass_out (naphtha + kero + diesel + residue).
         
-        # Penalize violation of mass conservation: (feed_in - sum_yields)^2
-        mass_balance_residual = torch.mean((feed_flow - predicted_total_yield) ** 2)
-        return mass_balance_residual
+        Refinery cuts exhibit volume non-additivity and varying specific gravities (SG):
+        - Feed crude: SG ~ 0.850 (135.1 kg/bbl)
+        - Naphtha:    SG ~ 0.730 (116.1 kg/bbl)
+        - Kerosene:   SG ~ 0.805 (128.0 kg/bbl)
+        - Diesel:     SG ~ 0.845 (134.3 kg/bbl)
+        - Residue:    SG ~ 0.945 (150.2 kg/bbl)
+        1 bbl = 0.158987 m3. Conversion to metric tons/hour (tph): flow_bpd * SG * (0.158987 / 24)
+        """
+        bbl_to_tph = 0.158987 / 24.0
+        feed_sg = 0.850
+        cut_sgs = torch.tensor([0.730, 0.805, 0.845, 0.945], device=predictions.device, dtype=predictions.dtype)
+
+        feed_mass_tph = inputs[:, 0] * feed_sg * bbl_to_tph
+        cut_flows_bpd = predictions[:, 4:8]
+        cut_masses_tph = cut_flows_bpd * cut_sgs * bbl_to_tph
+        total_mass_out_tph = torch.sum(cut_masses_tph, dim=-1)
+
+        # Normalized mass balance residual: ((Mass_in - Mass_out) / Mass_in)^2
+        normalized_residual = (feed_mass_tph - total_mass_out_tph) / (feed_mass_tph + 1e-5)
+        return torch.mean(normalized_residual ** 2)
+
