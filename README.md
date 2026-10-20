@@ -1,5 +1,9 @@
 # DeepRefine: Open Industrial Reference Architecture & Testbed
 
+[![CI](https://github.com/dhrubchatterjee16-lang/DeepRefine/actions/workflows/ci.yml/badge.svg)](https://github.com/dhrubchatterjee16-lang/DeepRefine/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.2+-ee4c2c.svg)](https://pytorch.org/)
 [![Standards](https://img.shields.io/badge/ISA--95%20%7C%20IEC%2062443%20%7C%20VDI%202048-Compliant-green.svg)](https://www.isa.org/)
