@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+message: "If you use DeepRefine in your research or industrial systems, please cite it as below."
+authors:
+  - family-names: "Chatterjee"
+    given-names: "Dhrub"
+title: "DeepRefine: Open Industrial Reference Architecture & Testbed for Level 3 Supervisory RTO, Physics-Informed Digital Twins, and API 670 Diagnostics"
+version: 1.0.0
+date-released: 2026-10-20
+url: "https://github.com/dhrubchatterjee16-lang/DeepRefine"
+keywords:
+  - process-control
+  - digital-twin
+  - isa-95
+  - pinn
+  - chemical-engineering
